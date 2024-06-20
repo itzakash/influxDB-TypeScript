@@ -19,6 +19,10 @@ const port = 3000;
 // Middleware to parse JSON bodies
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("Hello");
+});
+
 // Route to write data to InfluxDB
 app.post("/write-data", (req, res) => {
   // Create a write API instance
@@ -64,9 +68,30 @@ app.post("/write-data", (req, res) => {
   // });
 });
 
-// app.get("/health", async (req, res) => {
-//   await client.ping(5000);
-// });
+app.get("/read-data", async (req, res) => {
+  try {
+    const queryApi = client.getQueryApi(org);
+
+    const query = `from (bucket:"tasks") 
+                    |> range(start: 1) 
+                    |> filter(fn: (r) => r._measurement == "practice") 
+                    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                    |> filter(fn: (r) => r.name == "akash")`;
+
+    // for await (const { values, tableMeta } of queryApi.iterateRows(query)) {
+    //   const o = tableMeta.toObject(values);
+    //   console.log(o);
+    // }
+
+    const result = await queryApi.collectRows(query);
+
+    // console.log(result);
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
